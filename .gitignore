@@ -23,6 +23,8 @@ build/
 
 # Runtime data
 data/
+!integrations/mitre_attack/data/
+!integrations/mitre_attack/data/**
 *.db
 *.db-shm
 *.db-wal
