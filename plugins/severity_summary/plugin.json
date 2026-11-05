@@ -1,0 +1,11 @@
+{
+  "id": "severity_summary",
+  "name": "Severity Summary",
+  "version": "1.0.0",
+  "description": "Aggregates assessment findings by severity and returns the highest-priority items for triage.",
+  "author": "DarkByteHunter",
+  "entrypoint": "plugin.py:run",
+  "permissions": ["read:findings"],
+  "enabled_default": false,
+  "min_ares_version": "1.0.0"
+}

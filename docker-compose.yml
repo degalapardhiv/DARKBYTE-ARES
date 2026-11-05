@@ -1,0 +1,97 @@
+name: darkbyte-ares
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-ares}
+      POSTGRES_USER: ${POSTGRES_USER:-ares}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ares-local-only}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ares} -d ${POSTGRES_DB:-ares}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ares-internal
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ares-internal
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      DEBUG: "false"
+      DEMO_MODE: ${DEMO_MODE:-true}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      SECRET_KEY: ${SECRET_KEY:-development-compose-only-change-this-secret-key}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-ares}:${POSTGRES_PASSWORD:-ares-local-only}@postgres:5432/${POSTGRES_DB:-ares}
+      REDIS_URL: redis://redis:6379/0
+      REPORTS_DIR: /app/data/reports
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8080,http://localhost:5173}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@ares.example.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Ares!Admin2026}
+      ANALYST_EMAIL: ${ANALYST_EMAIL:-analyst@ares.example.com}
+      ANALYST_PASSWORD: ${ANALYST_PASSWORD:-Ares!Analyst2026}
+      MAX_SCAN_HOSTS: ${MAX_SCAN_HOSTS:-64}
+      MAX_PORTS_PER_SCAN: ${MAX_PORTS_PER_SCAN:-512}
+      MAX_CONCURRENT_ASSESSMENTS: ${MAX_CONCURRENT_ASSESSMENTS:-2}
+      RATE_LIMIT_PER_MINUTE: ${RATE_LIMIT_PER_MINUTE:-120}
+      ACTIVE_SCAN_RATE_LIMIT: ${ACTIVE_SCAN_RATE_LIMIT:-30}
+    volumes:
+      - ares-data:/app/data
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    read_only: false
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - ares-internal
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - ares-internal
+
+volumes:
+  postgres-data:
+  redis-data:
+  ares-data:
+
+networks:
+  ares-internal:
+    driver: bridge
